@@ -192,9 +192,7 @@
         gestisciScelteMultiple('telefono', 'sceltaTelefono', c.tel || []);
         gestisciScelteMultiple('email', 'sceltaEmail', c.email || []);
 
-        document.getElementById('contattoHint').innerText = nome
-          ? ("✅ Selezionato: " + nome + " — controlla telefono/email qui sotto")
-          : "";
+        document.getElementById('contattoHint').innerText = "";
       }).catch(function(err) {
         document.getElementById('contattoHint').innerText = "Selezione annullata o non riuscita.";
       });
