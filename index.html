@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>App Ricevute</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      background: #f2f4f7;
+      margin: 0;
+      padding: 16px;
+      color: #222;
+    }
+    .card {
+      background: white;
+      border-radius: 10px;
+      padding: 20px;
+      max-width: 420px;
+      margin: 0 auto;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    }
+    h1 {
+      font-size: 20px;
+      margin-top: 0;
+      color: #2e6b3e;
+    }
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: bold;
+      margin-top: 14px;
+      margin-bottom: 4px;
+      color: #555;
+    }
+    input {
+      width: 100%;
+      padding: 10px;
+      font-size: 15px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+    }
+    input[readonly] {
+      background: #eee;
+      color: #666;
+    }
+    .row {
+      display: flex;
+      gap: 8px;
+    }
+    .row input { flex: 1; }
+    button {
+      width: 100%;
+      padding: 12px;
+      font-size: 15px;
+      border: none;
+      border-radius: 6px;
+      margin-top: 14px;
+      cursor: pointer;
+    }
+    .btn-primary {
+      background: #2e6b3e;
+      color: white;
+    }
+    .btn-secondary {
+      background: #eee;
+      color: #333;
+      margin-top: 8px;
+    }
+    .btn-whatsapp {
+      background: #25D366;
+      color: white;
+    }
+    .btn-email {
+      background: #4285F4;
+      color: white;
+    }
+    #msg {
+      margin-top: 12px;
+      font-size: 14px;
+      text-align: center;
+    }
+    #azioniInvio {
+      display: none;
+      margin-top: 10px;
+      border-top: 1px solid #eee;
+      padding-top: 10px;
+    }
+    .hint {
+      font-size: 12px;
+      color: #888;
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>🧾 Nuova ricevuta</h1>
+
+    <label>Nr. ricevuta</label>
+    <input id="numero" readonly>
+
+    <label>Data</label>
+    <input id="data" readonly>
+
+    <label>Ricevuto da</label>
+    <div class="row">
+      <input id="ricevutoDa" placeholder="Nome e cognome">
+      <button type="button" class="btn-secondary" style="width:auto; margin-top:0;" onclick="scegliContatto()">📇</button>
+    </div>
+    <div class="hint" id="contattoHint"></div>
+
+    <label>Telefono</label>
+    <input id="telefono" placeholder="" type="tel">
+
+    <label>Email</label>
+    <input id="email" placeholder="" type="email">
+
+    <label>Importo (€)</label>
+    <input id="importo" placeholder="Es. 50" type="number" step="0.01">
+
+    <label>Causale</label>
+    <input id="causale" placeholder="">
+
+    <button class="btn-primary" onclick="salva()">💾 Salva ricevuta</button>
+
+    <div id="msg"></div>
+
+    <div id="azioniInvio">
+      <button class="btn-whatsapp" id="btnWhatsapp" onclick="inviaWhatsapp()">📲 Invia su WhatsApp</button>
+      <button class="btn-email" id="btnEmail" onclick="inviaEmail()">✉️ Invia via Email</button>
+      <button class="btn-secondary" onclick="nuovaRicevuta()">➕ Nuova ricevuta</button>
+    </div>
+  </div>
+
+  <script>
+    // *** IMPORTANTE: incolla qui sotto l'URL del tuo Apps Script (quello che finisce in /exec) ***
+    var API_URL = "https://script.google.com/macros/s/AKfycbw5b2yz67_E0RMU6eZusyF5C7-Vz2TV8tZI62zGt3B5H_VfBnF-3q55w45cT4TxdjE/exec";
+
+    var ricevutaSalvata = false;
+
+    function oggiFormattato() {
+      var d = new Date();
+      var gg = ("0" + d.getDate()).slice(-2);
+      var mm = ("0" + (d.getMonth() + 1)).slice(-2);
+      var aaaa = d.getFullYear();
+      return gg + "/" + mm + "/" + aaaa;
+    }
+
+    function leggiDatiForm() {
+      return {
+        numero: document.getElementById('numero').value,
+        data: document.getElementById('data').value,
+        ricevutoDa: document.getElementById('ricevutoDa').value.trim(),
+        telefono: document.getElementById('telefono').value.trim(),
+        email: document.getElementById('email').value.trim(),
+        importo: document.getElementById('importo').value,
+        causale: document.getElementById('causale').value.trim()
+      };
+    }
+
+    function caricaNumero() {
+      document.getElementById('data').value = oggiFormattato();
+      fetch(API_URL + "?action=numero")
+        .then(function(r) { return r.json(); })
+        .then(function(dati) {
+          document.getElementById('numero').value = dati.numero;
+        })
+        .catch(function(err) {
+          document.getElementById('numero').value = "Errore";
+          document.getElementById('msg').innerText = "Errore nel recupero del numero.";
+        });
+    }
+
+    function scegliContatto() {
+      if (!('contacts' in navigator && 'ContactsManager' in window)) {
+        document.getElementById('contattoHint').innerText =
+          "La selezione dalla rubrica non è supportata su questo browser: inserisci i dati a mano.";
+        return;
+      }
+      var props = ['name', 'tel', 'email'];
+      var opts = { multiple: false };
+      navigator.contacts.select(props, opts).then(function(contatti) {
+        if (!contatti.length) return;
+        var c = contatti[0];
+        if (c.name && c.name.length) document.getElementById('ricevutoDa').value = c.name[0];
+        if (c.tel && c.tel.length) document.getElementById('telefono').value = c.tel[0];
+        if (c.email && c.email.length) document.getElementById('email').value = c.email[0];
+        document.getElementById('contattoHint').innerText = "";
+      }).catch(function(err) {
+        document.getElementById('contattoHint').innerText = "Selezione annullata o non riuscita.";
+      });
+    }
+
+    function salva() {
+      var dati = leggiDatiForm();
+
+      if (!dati.ricevutoDa || !dati.importo || !dati.causale) {
+        document.getElementById('msg').innerText = "Compila almeno Ricevuto da, Importo e Causale.";
+        return;
+      }
+
+      document.getElementById('msg').innerText = "Salvataggio in corso...";
+
+      fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(dati)
+      })
+        .then(function(r) { return r.json(); })
+        .then(function(risultato) {
+          document.getElementById('msg').innerText = "✅ Ricevuta " + risultato.numero + " salvata!";
+          ricevutaSalvata = true;
+          document.getElementById('azioniInvio').style.display = 'block';
+          aggiornaStatoPulsantiInvio();
+        })
+        .catch(function(err) {
+          document.getElementById('msg').innerText = "Errore nel salvataggio.";
+        });
+    }
+
+    function aggiornaStatoPulsantiInvio() {
+      var dati = leggiDatiForm();
+      document.getElementById('btnWhatsapp').disabled = !dati.telefono;
+      document.getElementById('btnEmail').disabled = !dati.email;
+    }
+
+    function testoConferma(d) {
+      return "Gentile " + d.ricevutoDa + ",\n\n" +
+      "confermo il versamento di € " + d.importo + ",\n" +
+        "(ricevuta n. " + d.numero + " del " + d.data + ") per: " + d.causale + ".\n\n" +"Grazie!\n" +
+        "Dario" ;
+    }
+
+    function formattaNumeroWhatsapp(numero) {
+      var pulito = numero.replace(/[^0-9+]/g, '');
+      if (pulito.charAt(0) === '+') pulito = pulito.substring(1);
+      if (pulito.length === 10 && pulito.charAt(0) === '3') {
+        pulito = '39' + pulito;
+      }
+      return pulito;
+    }
+
+    function inviaWhatsapp() {
+      if (!ricevutaSalvata) return;
+      var d = leggiDatiForm();
+      var numeroPulito = formattaNumeroWhatsapp(d.telefono);
+      var testo = encodeURIComponent(testoConferma(d));
+      window.open("https://wa.me/" + numeroPulito + "?text=" + testo, "_blank");
+    }
+
+    function inviaEmail() {
+      if (!ricevutaSalvata) return;
+      var d = leggiDatiForm();
+      var oggetto = encodeURIComponent("Conferma ricevuta n. " + d.numero);
+      var corpo = encodeURIComponent(testoConferma(d));
+      window.open("mailto:" + d.email + "?subject=" + oggetto + "&body=" + corpo, "_blank");
+    }
+
+    function nuovaRicevuta() {
+      document.getElementById('ricevutoDa').value = "";
+      document.getElementById('telefono').value = "";
+      document.getElementById('email').value = "";
+      document.getElementById('importo').value = "";
+      document.getElementById('causale').value = "";
+      document.getElementById('msg').innerText = "";
+      document.getElementById('azioniInvio').style.display = 'none';
+      ricevutaSalvata = false;
+      caricaNumero();
+    }
+
+    document.getElementById('telefono').addEventListener('input', function() {
+      if (ricevutaSalvata) aggiornaStatoPulsantiInvio();
+    });
+    document.getElementById('email').addEventListener('input', function() {
+      if (ricevutaSalvata) aggiornaStatoPulsantiInvio();
+    });
+
+    caricaNumero();
+  </script>
+</body>
+</html>
