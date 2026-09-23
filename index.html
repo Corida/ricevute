@@ -206,19 +206,22 @@
       var contenitore = document.getElementById(idContenitore);
       contenitore.innerHTML = '';
 
-      if (valori.length === 0) {
+      // Elimina eventuali duplicati (stesso numero/email inserito più volte nel contatto)
+      var valoriUnici = valori.filter(function(v, i) { return valori.indexOf(v) === i; });
+
+      if (valoriUnici.length === 0) {
         campo.value = '';
         contenitore.style.display = 'none';
         return;
       }
-      if (valori.length === 1) {
-        campo.value = valori[0];
+      if (valoriUnici.length === 1) {
+        campo.value = valoriUnici[0];
         contenitore.style.display = 'none';
         return;
       }
 
-      // Più di un valore: mostra il menu a tendina per scegliere
-      campo.value = valori[0];
+      // Più di un valore DIVERSO: mostra il menu a tendina per scegliere
+      campo.value = valoriUnici[0];
       var select = document.createElement('select');
       select.style.width = '100%';
       select.style.padding = '8px';
@@ -226,7 +229,7 @@
       select.style.border = '1px solid #ccc';
       select.style.borderRadius = '6px';
 
-      valori.forEach(function(v) {
+      valoriUnici.forEach(function(v) {
         var opt = document.createElement('option');
         opt.value = v;
         opt.textContent = v;
