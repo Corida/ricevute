@@ -1,4 +1,4 @@
-<!-- VERSIONE: 260923_01 -->
+<!-- VERSIONE: 260923_02 -->
 <!DOCTYPE html>
 <html>
 <head>
@@ -219,7 +219,13 @@
         var nome = (c.name && c.name.length) ? c.name[0] : "";
         document.getElementById('ricevutoDa').value = nome;
 
-        gestisciScelteMultiple('telefono', 'sceltaTelefono', c.tel || [], function(v) { return v.replace(/\s+/g, ''); });
+        gestisciScelteMultiple('telefono', 'sceltaTelefono', c.tel || [],
+          function(v) { return v.replace(/\s+/g, ''); },
+          function(v) {
+            var cifre = v.replace(/\D/g, '');
+            return cifre.length > 10 ? cifre.slice(-10) : cifre;
+          }
+        );
         gestisciScelteMultiple('email', 'sceltaEmail', c.email || [], function(v) { return v.trim(); });
 
         document.getElementById('contattoHint').innerText = "";
@@ -231,15 +237,27 @@
     // Se il contatto ha un solo numero/email lo inserisce direttamente.
     // Se ne ha più di uno, mostra un menu a tendina per scegliere quale usare
     // (utile per evitare di prendere per sbaglio un telefono fisso al posto del cellulare)
-    function gestisciScelteMultiple(idCampo, idContenitore, valori, normalizza) {
-      normalizza = normalizza || function(v) { return v.trim(); };
+    function gestisciScelteMultiple(idCampo, idContenitore, valori, normalizzaDisplay, chiaveConfronto) {
+      normalizzaDisplay = normalizzaDisplay || function(v) { return v.trim(); };
+      chiaveConfronto = chiaveConfronto || normalizzaDisplay;
+
       var campo = document.getElementById(idCampo);
       var contenitore = document.getElementById(idContenitore);
       contenitore.innerHTML = '';
 
-      // Normalizza (es. toglie spazi) e poi elimina eventuali duplicati
-      var valoriPuliti = valori.map(normalizza).filter(function(v) { return v.length > 0; });
-      var valoriUnici = valoriPuliti.filter(function(v, i) { return valoriPuliti.indexOf(v) === i; });
+      var puliti = valori.map(normalizzaDisplay).filter(function(v) { return v.length > 0; });
+
+      // Elimina i duplicati confrontando in base alla "chiave" (es. ultime 10 cifre per i telefoni,
+      // così +39, 0039 o nessun prefisso davanti allo stesso numero contano come uguali)
+      var chiaviViste = [];
+      var valoriUnici = [];
+      puliti.forEach(function(v) {
+        var k = chiaveConfronto(v);
+        if (chiaviViste.indexOf(k) === -1) {
+          chiaviViste.push(k);
+          valoriUnici.push(v);
+        }
+      });
 
       if (valoriUnici.length === 0) {
         campo.value = '';
