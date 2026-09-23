@@ -1,3 +1,4 @@
+<!-- VERSIONE: 260923_01 -->
 <!DOCTYPE html>
 <html>
 <head>
@@ -92,9 +93,23 @@
       color: #888;
       margin-top: 4px;
     }
+    .overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(255,255,255,0.92);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 30px;
+      font-size: 16px;
+      color: #444;
+      z-index: 1000;
+    }
   </style>
 </head>
 <body>
+  <div id="overlayCaricamento" class="overlay">⏳ Recupero numero ricevuta in corso...</div>
   <div class="card">
     <h1>🧾 Nuova ricevuta</h1>
 
@@ -107,7 +122,7 @@
     <label>Ricevuto da</label>
     <div class="row">
       <input id="ricevutoDa" placeholder="Nome e cognome">
-      <button type="button" class="btn-secondary" style="width:auto; margin-top:0;" onclick="scegliContatto()">📇</button>
+      <button type="button" id="btnContatto" class="btn-secondary" style="width:auto; margin-top:0;" onclick="scegliContatto()">📇</button>
     </div>
     <div class="hint" id="contattoHint"></div>
 
@@ -125,7 +140,7 @@
     <label>Causale</label>
     <input id="causale" placeholder="">
 
-    <button class="btn-primary" onclick="salva()">💾 Salva ricevuta</button>
+    <button class="btn-primary" id="btnSalva" onclick="salva()">💾 Salva ricevuta</button>
 
     <div id="msg"></div>
 
@@ -162,16 +177,31 @@
       };
     }
 
-    function caricaNumero() {
+    function caricaNumero(tentativo) {
+      tentativo = tentativo || 1;
       document.getElementById('data').value = oggiFormattato();
+      document.getElementById('overlayCaricamento').style.display = 'flex';
+      document.getElementById('btnSalva').disabled = true;
+      document.getElementById('btnContatto').disabled = true;
+
       fetch(API_URL + "?action=numero")
         .then(function(r) { return r.json(); })
         .then(function(dati) {
           document.getElementById('numero').value = dati.numero;
+          document.getElementById('overlayCaricamento').style.display = 'none';
+          document.getElementById('btnSalva').disabled = false;
+          document.getElementById('btnContatto').disabled = false;
         })
         .catch(function(err) {
-          document.getElementById('numero').value = "Errore";
-          document.getElementById('msg').innerText = "Errore nel recupero del numero.";
+          if (tentativo < 3) {
+            setTimeout(function() { caricaNumero(tentativo + 1); }, 1000);
+          } else {
+            document.getElementById('numero').value = "Errore";
+            document.getElementById('msg').innerText = "Errore nel recupero del numero. Ricarica la pagina.";
+            document.getElementById('overlayCaricamento').style.display = 'none';
+            document.getElementById('btnSalva').disabled = false;
+            document.getElementById('btnContatto').disabled = false;
+          }
         });
     }
 
@@ -189,8 +219,8 @@
         var nome = (c.name && c.name.length) ? c.name[0] : "";
         document.getElementById('ricevutoDa').value = nome;
 
-        gestisciScelteMultiple('telefono', 'sceltaTelefono', c.tel || []);
-        gestisciScelteMultiple('email', 'sceltaEmail', c.email || []);
+        gestisciScelteMultiple('telefono', 'sceltaTelefono', c.tel || [], function(v) { return v.replace(/\s+/g, ''); });
+        gestisciScelteMultiple('email', 'sceltaEmail', c.email || [], function(v) { return v.trim(); });
 
         document.getElementById('contattoHint').innerText = "";
       }).catch(function(err) {
@@ -201,13 +231,15 @@
     // Se il contatto ha un solo numero/email lo inserisce direttamente.
     // Se ne ha più di uno, mostra un menu a tendina per scegliere quale usare
     // (utile per evitare di prendere per sbaglio un telefono fisso al posto del cellulare)
-    function gestisciScelteMultiple(idCampo, idContenitore, valori) {
+    function gestisciScelteMultiple(idCampo, idContenitore, valori, normalizza) {
+      normalizza = normalizza || function(v) { return v.trim(); };
       var campo = document.getElementById(idCampo);
       var contenitore = document.getElementById(idContenitore);
       contenitore.innerHTML = '';
 
-      // Elimina eventuali duplicati (stesso numero/email inserito più volte nel contatto)
-      var valoriUnici = valori.filter(function(v, i) { return valori.indexOf(v) === i; });
+      // Normalizza (es. toglie spazi) e poi elimina eventuali duplicati
+      var valoriPuliti = valori.map(normalizza).filter(function(v) { return v.length > 0; });
+      var valoriUnici = valoriPuliti.filter(function(v, i) { return valoriPuliti.indexOf(v) === i; });
 
       if (valoriUnici.length === 0) {
         campo.value = '';
@@ -255,6 +287,7 @@
       }
 
       document.getElementById('msg').innerText = "Salvataggio in corso...";
+      document.getElementById('btnSalva').disabled = true;
 
       fetch(API_URL, {
         method: 'POST',
@@ -270,6 +303,7 @@
         })
         .catch(function(err) {
           document.getElementById('msg').innerText = "Errore nel salvataggio.";
+          document.getElementById('btnSalva').disabled = false;
         });
     }
 
